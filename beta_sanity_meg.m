@@ -74,39 +74,6 @@ for partic=1:length(Partic)
     N_keep=100;
     [sorted_power, sort_power_i]=sort(specEv_struct.Events.Events.maximapower, 'descend');
     event_i_tokeep=sort(sort_power_i(1:N_keep));
-    
-    
-    
-    
-    for event=1:N_keep
-        
-        
-        
-        
-            max_t=specEv_struct.Events.Events.maximatiming(specEv_struct.Events.Events.trialind==trial);
-            max_f=specEv_struct.Events.Events.maximafreq(specEv_struct.Events.Events.trialind==trial);
-            max_t_realtime=[];
-                 %% save a
-
-                 onset=specEv_struct.Events.Events.onsettiming(specEv_struct.Events.Events.trialind==trial);
-                 offset=specEv_struct.Events.Events.offsettiming(specEv_struct.Events.Events.trialind==trial);
-                 onset_realtime=[];
-                 offset_realtime=[];
-                 for i=1:length(max_t)
-                     onset_realtime(i)=tVec(find(round(tVec_assumed,3)==round(onset(i),3)));
-                     offset_realtime(i)=tVec(find(round(tVec_assumed,3)==round(offset(i),3)));
-                 end
-                 event_onset=[event_onset, max(onset_realtime)];
-                 event_offset=[event_offset,max(offset_realtime)];
-
-                 if ~isempty(onset_realtime)
-                     event_trial=[event_trial,trial];
-                 end
-
-    end
-    close all    
-
-
 
 
     %let's define which random times we'll use for each trial 
@@ -608,6 +575,12 @@ for partic=1:length(Partic)
     % Image1 = Slide1.Shapes.AddPicture(strcat(cd,'/temp','.png'),'msoFalse','msoTrue',120,0,700,540);%10,20,700,500
     % 
 
+    
+    
+    
+    
+    
+    
 
     %% now I want to actually compare the two waveforms (random vs event)
     %let's look at the width
@@ -636,6 +609,10 @@ for partic=1:length(Partic)
                 prev_peak_latency(trial)=latency+1;
                 prev_peak_value(trial)=this_data(trial,prev_peak_latency(trial));
                 found_peak=1;
+            elseif isnan(this_data(trial,latency))
+                prev_peak_latency(trial)=nan;
+                prev_peak_value(trial)=nan;
+                found_peak=1;
             end
         end
          %forwards
@@ -648,7 +625,12 @@ for partic=1:length(Partic)
                 post_peak_latency(trial)=latency-1;
                 post_peak_value(trial)=this_data(trial,post_peak_latency(trial));
                 found_peak=1;
+            elseif isnan(this_data(trial,latency))
+                post_peak_latency(trial)=nan;
+                post_peak_value(trial)=nan;
+                found_peak=1;
             end
+            
         end
 
         peak_to_peak_latency(trial)=post_peak_latency(trial)-prev_peak_latency(trial);
@@ -656,17 +638,17 @@ for partic=1:length(Partic)
     end
 
     if p==1
-        peak_to_peak_latency_ryan_all(partic)=mean(peak_to_peak_latency);
-        trough_to_peak_amp_ryan_all(partic)=mean(trough_to_peak_amp);
-        trough_value_ryan_all(partic)=mean(trough_value);
-        post_peak_value_ryan_all(partic)=mean(post_peak_value);
-        prev_peak_value_ryan_all(partic)=mean(prev_peak_value);
+        peak_to_peak_latency_ryan_all(partic)=nanmean(peak_to_peak_latency);
+        trough_to_peak_amp_ryan_all(partic)=nanmean(trough_to_peak_amp);
+        trough_value_ryan_all(partic)=nanmean(trough_value);
+        post_peak_value_ryan_all(partic)=nanmean(post_peak_value);
+        prev_peak_value_ryan_all(partic)=nanmean(prev_peak_value);
     else
-        peak_to_peak_latency_all(partic)=mean(peak_to_peak_latency);
-        trough_to_peak_amp_all(partic)=mean(trough_to_peak_amp);
-        trough_value_all(partic)=mean(trough_value);
-        post_peak_value_all(partic)=mean(post_peak_value);
-        prev_peak_value_all(partic)=mean(prev_peak_value);
+        peak_to_peak_latency_all(partic)=nanmean(peak_to_peak_latency);
+        trough_to_peak_amp_all(partic)=nanmean(trough_to_peak_amp);
+        trough_value_all(partic)=nanmean(trough_value);
+        post_peak_value_all(partic)=nanmean(post_peak_value);
+        prev_peak_value_all(partic)=nanmean(prev_peak_value);
     end
 
     xtext=sprintf(['Peak2Peak-Lat:  %2.2f (%2.2f) \n'...
@@ -675,12 +657,12 @@ for partic=1:length(Partic)
         'Trough-Amp:  %2.2f (%2.2f) \n'...
         'Peak-Amp:  %2.2f (%2.2f) \n'...
         'Peak-Amp Diff:  %2.2f (%2.2f) \n'],...
-        mean(peak_to_peak_latency),std(peak_to_peak_latency),...
-        round(1000/mean(peak_to_peak_latency)),...
-        mean(trough_to_peak_amp),std(trough_to_peak_amp),...
-        mean(trough_value),std(trough_value),...
-        mean(mean([post_peak_value;prev_peak_value])),std(mean([post_peak_value;prev_peak_value])),...
-        mean([post_peak_value-prev_peak_value]),std([post_peak_value-prev_peak_value]));
+        mean(peak_to_peak_latency),nanstd(peak_to_peak_latency),...
+        round(1000/nanmean(peak_to_peak_latency)),...
+        mean(trough_to_peak_amp),nanstd(trough_to_peak_amp),...
+        mean(trough_value),nanstd(trough_value),...
+        mean(nanmean([post_peak_value;prev_peak_value])),nanstd(nanmean([post_peak_value;prev_peak_value])),...
+        mean([post_peak_value-prev_peak_value]),nanstd([post_peak_value-prev_peak_value]));
 
         if p==1
             tx=text(-plot_time/2/3-150,ylims(1)+(ylims(2)-ylims(1))/4,xtext );
@@ -705,7 +687,7 @@ for partic=1:length(Partic)
     for p=1:2 %beta or random
         for o=1:2 %alpha or beta shown
                 if p==1
-                    S = mean(trough_lock_ryan,1);
+                    S = nanmean(trough_lock_ryan,1);
                     if o==1
                         subplot(2,2,2)                   
                         title('TFR of Avg - Event - Beta')
@@ -720,7 +702,7 @@ for partic=1:length(Partic)
                         band=[8 13];
                     end
                 else
-                    S = mean(trough_lock,1);
+                    S = nanmean(trough_lock,1);
                     if o==1
                         subplot(2,2,1) 
                         title('TFR of Avg - Random - Beta')
@@ -784,14 +766,6 @@ for partic=1:length(Partic)
     %                     caxis(caxis_alpha);
                     end
                 end
-                % Overlay locations of event peaks and the waveform corresponding with each trial
-                hold on
-                max_t=specEv_struct.Events.Events.maximatiming(specEv_struct.Events.Events.trialind==trial);
-                max_f=specEv_struct.Events.Events.maximafreq(specEv_struct.Events.Events.trialind==trial);
-                max_t_realtime=[];
-                for i=1:length(max_t)
-                    max_t_realtime(i)=tVec(find(round(tVec_assumed,3)==round(max_t(i),3)));
-                end
 
 
                 yyaxis right
@@ -816,8 +790,8 @@ for partic=1:length(Partic)
 
     close all
 
-    trough_lock_all(partic,:)=mean(trough_lock);
-    trough_lock_ryan_all(partic,:)=mean(trough_lock_ryan);
+    trough_lock_all(partic,:)=nanmean(trough_lock);
+    trough_lock_ryan_all(partic,:)=nanmean(trough_lock_ryan);
 end
 
 
