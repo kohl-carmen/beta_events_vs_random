@@ -856,11 +856,13 @@ legend(lines,'Random','Event')
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% are all positive peaks greater than 0?
 [H,P,CI,STATS]=ttest(post_peak_value_all);
 [H,P,CI,STATS]=ttest(prev_peak_value_all);
 [H,P,CI,STATS]=ttest(post_peak_value_ryan_all);
 [H,P,CI,STATS]=ttest(prev_peak_value_ryan_all);
-    
+ 
+%compare beta and rnd summary stats
 [H,P,CI,STATS]=ttest(peak_to_peak_latency_all,peak_to_peak_latency_ryan_all)
 [H,P,CI,STATS]=ttest(trough_to_peak_amp_all,trough_to_peak_amp_ryan_all)
 [H,P,CI,STATS]=ttest(trough_value_all,trough_value_ryan_all)
@@ -871,7 +873,7 @@ legend(lines,'Random','Event')
 %% amp ttest per timepoint
 h=[];
 p=[];
-for i=1:301
+for i=1:length(trough_lock_all)
     [h(i),p(i),CI,STATS]=ttest(trough_lock_all(:,i),trough_lock_ryan_all(:,i));
 end
 h(h==0)=nan;
@@ -882,7 +884,7 @@ plot([-plot_time/2:dt:plot_time/2],h,'k*')
 
 % FDR correction
 sort_i={};
-data_length=301
+data_length=length(trough_lock_all);
 corrected_p=nan(size(p));
 corrected_abs=nan(size(p));
 
@@ -898,5 +900,52 @@ end
 h(sort_i)=corrected_abs;
 plot([-plot_time/2:dt:plot_time/2],h-1,'r*')
 
+print('-dpng','-r150',strcat('temp','.png'));
+blankSlide = Presentation.SlideMaster.CustomLayouts.Item(7);
+Slide1 = Presentation.Slides.AddSlide(1,blankSlide);
+Image1 = Slide1.Shapes.AddPicture(strcat(cd,'/temp','.png'),'msoFalse','msoTrue',120,0,700,540);%10,20,700,500
 
+
+%% slope ttest per timepoint
+
+slope_int=20;
+h=nan(length(trough_lock_all),1);
+p=nan(length(trough_lock_all),1);
+for i=slope_int/2/dt+1:length(trough_lock_all)-slope_int/dt/2-1
+    time_oi=i-slope_int/dt/2:i+slope_int/dt/2;
+    slope_rnd=[];
+    slope_ryan=[];
+    for partic=1:length(Partic)
+        P=polyfit(tVec(time_oi),trough_lock_all(partic,time_oi),1);
+        slope_rnd(partic)=P(1);
+        P=polyfit(tVec(time_oi),trough_lock_ryan_all(partic,time_oi),1);
+        slope_ryan(partic)=P(1);
+    end
+    
+    [h(i),p(i),CI,STATS]=ttest(slope_rnd,slope_ryan);
+end
+
+h(h==0)=nan;
+h(h==1)=0;
+plot([-plot_time/2:dt:plot_time/2],h,'k*')
+
+
+
+% FDR correction
+sort_i={};
+data_length=length(trough_lock_all);
+corrected_p=nan(size(p));
+corrected_abs=nan(size(p));
+
+[sorted_p, sort_i]=sort(p);
+
+for i=1:length(p)-1
+    corrected_p(end-i)= sorted_p(end-i)*data_length/(data_length-i);
+    if sorted_p(end-i)*data_length/(data_length-i) < 0.05
+        corrected_abs(end-i)=1;
+    end
+end
+
+h(sort_i)=corrected_abs;
+plot([-plot_time/2:dt:plot_time/2],h-1,'g*')
     
