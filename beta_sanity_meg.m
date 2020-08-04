@@ -1,8 +1,17 @@
+%% Comparing Beta Events to Randomly Selected Minima
+
+%Shin MEG data: https://datadryad.org/stash/dataset/doi:10.5061/dryad.pn931 
+
 clear
 
 ppt=1;
 h = actxserver('PowerPoint.Application');
 Presentation = h.Presentation.Add;
+
+alphaband=[8 13];
+betaband=[15 29];
+plot_time =500;
+    
 
 rng('shuffle')
 Partic=[1:10];
@@ -21,15 +30,12 @@ prev_peak_value_ryan_all=[];
 
 for partic=1:length(Partic)
 
-    clearvars -except partic Partic h Presentation trough_lock_all trough_lock_ryan_all peak_to_peak_latency_all trough_to_peak_amp_all trough_value_all post_peak_value_all prev_peak_value_all peak_to_peak_latency_ryan_all trough_to_peak_amp_ryan_all trough_value_ryan_all post_peak_value_ryan_all prev_peak_value_ryan_all
+    clearvars -except partic Partic h Presentation trough_lock_all trough_lock_ryan_all peak_to_peak_latency_all trough_to_peak_amp_all trough_value_all post_peak_value_all prev_peak_value_all peak_to_peak_latency_ryan_all trough_to_peak_amp_ryan_all trough_value_ryan_all post_peak_value_ryan_all prev_peak_value_ryan_all alphaband betaband plot_time
+    %% load data
     data_path='F:\Brown\Shin Data\HumanDetection\';
     filename=strcat('prestim_humandetection_subject',num2str(Partic(partic)),'.mat');
 
     load(strcat(data_path,filename))
-
-
-
-
 
     % Fs: sampling rate (Hz)
     % prestim__yes_no: 1 second prestimulus trace. 
@@ -41,18 +47,23 @@ for partic=1:length(Partic)
 
     data=prestim_raw_yes_no';
     nr_trials=size(data,2);
+    
+    
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %% Define Events
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
     Fs=600;
     dt=1000/600;
     X{1}=data;
     tVec_assumed=linspace(1/Fs,1,Fs);
-    %% Spectral events
-    alphaband=[8 13];
-    betaband=[15 29];
+    
+    %% get beta events
     ryan='C:\Users\ckohl\Documents\MATLAB\Ryan';
     addpath(ryan)
     eventBand=betaband;
-    %% O
     fVec=3:3:30;
     findMethod=1;
     vis=0;
@@ -60,25 +71,15 @@ for partic=1:length(Partic)
     tVec_assumed=linspace(1/Fs,1,Fs);
     [specEv_struct,TFRs,X] = spectralevents(eventBand,fVec,Fs,findMethod,vis,X,classLabels);
 
-    event_trial=[];
-    event_max=[];
-    event_onset=[];
-    event_offset=[];
-
-    % sub_count=0;       
-    % figure('units','normalized','outerposition', [0 0 1 1]);
-    %for trial=unique(specEv_struct.Events.Events.trialind)'  
+ 
 
     %% take only the N_keep events with highest power
-    % 
     N_keep=100;
     [sorted_power, sort_power_i]=sort(specEv_struct.Events.Events.maximapower, 'descend');
     event_i_tokeep=sort(sort_power_i(1:N_keep));
 
 
-    %let's define which random times we'll use for each trial 
-    plot_time =500;%(this is dofferent form interval because trough could sit onthe edge of interval time so plot windw would reach way further
-    
+    %% randim minima selection
     % so far I've selected a time interval which varied in length per
     % trial, but to be consistent with prev papers, I'll just make them
     % 100ms;
@@ -110,9 +111,13 @@ for partic=1:length(Partic)
 
 
 
-    %% now let's plot the sanity betas to ryans betas
-    %% Plot beta peaks and me troughs to see if they overlap
-    % before I usually had an event and a fake one per trial. nowI don't.
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %% Plot individual trials and check for beta-rnd proximity
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %% Plot beta peaks and random troughs to see if they overlap
+    % before I usually had an event and a fake one per trial. now I don't.
     % I'll just plot all the events and if there happens to be a rnd one
     % I'll plot it, and if not I won't
     sub_count=0;       
@@ -128,10 +133,8 @@ for partic=1:length(Partic)
         end
         subplot(4,1,sub_count)
             %% plot ryan stuff
-            %% O
             this_TFR=squeeze(TFRs{1}(find(fVec==(eventBand(1))):find(fVec-eventBand(end)==min(abs(fVec-(eventBand(end))))),:,this_event_trial));
             imagesc([tVec(1) tVec(end)],eventBand,this_TFR)
-    %             imagesc([EEG.times(1) EEG.times(end)]],[fVec(1) fVec(end)],TFRs{1}(:,:,trial))
             colormap jet
             cb = colorbar;         
             % Overlay locations of event peaks and the waveform corresponding with each trial
@@ -145,7 +148,8 @@ for partic=1:length(Partic)
              plot(max_t_realtime,max_f,'.','Color',[.5 .5 .5],'Markersize',20) %Add points at event maxima
              
              
-             % find the event we're actually here for
+             % find the event we're actually here for (selected as high
+             % power)
              max_t=specEv_struct.Events.Events.maximatiming(event_i_tokeep(trial));
              max_t_realtime=tVec(find(round(tVec_assumed,3)==round(max_t,3)));
              max_f=specEv_struct.Events.Events.maximafreq(event_i_tokeep(trial));
@@ -159,9 +163,8 @@ for partic=1:length(Partic)
             title(strcat('Trial ',num2str(this_event_trial)))
 
 
-            %% plot my stuff
+            %% plot random minima
             if any(this_event_trial== trials_for_rnd)
-    %         data=EEG.data(electrode,interval_i.(strcat('T',num2str(trial))),trial);
                 this_data=data(interval_i.(strcat('T',num2str(this_event_trial))),this_event_trial);
 
                 [trough,trough_i]=min(this_data);
@@ -211,10 +214,8 @@ for partic=1:length(Partic)
         
         
             %% plot ryan stuff
-            %% O
             this_TFR=squeeze(TFRs{1}(find(fVec==(eventBand(1))):find(fVec-eventBand(end)==min(abs(fVec-(eventBand(end))))),:,this_event_trial));
             imagesc([tVec(1) tVec(end)],eventBand,this_TFR)
-    %             imagesc([EEG.times(1) EEG.times(end)]],[fVec(1) fVec(end)],TFRs{1}(:,:,trial))
             colormap jet
             cb = colorbar;         
             % Overlay locations of event peaks and the waveform corresponding with each trial
@@ -248,8 +249,7 @@ for partic=1:length(Partic)
             title(strcat('Trial ',num2str(this_event_trial)))
 
 
-            %% plot my stuff
-%         data=EEG.data(electrode,interval_i.(strcat('T',num2str(trial))),trial);
+            %% plot random minima
             this_data=data(interval_i.(strcat('T',num2str(this_event_trial))),this_event_trial);
 
             [trough,trough_i]=min(this_data);
@@ -316,7 +316,7 @@ for partic=1:length(Partic)
     figure('units','normalized','outerposition', [0 0 1 1]);
     hold on
     for trial_count = 1:N_keep
-        %% mine
+        %% random troughs
         trial=trials_for_rnd(trial_count);
     %     data=EEG.data(electrode,interval_i.(strcat('T',num2str(trial))),trial);
         this_data=data(interval_i.(strcat('T',num2str(trial))),trial);
@@ -324,23 +324,11 @@ for partic=1:length(Partic)
         [trough,trough_i]=min(this_data);   
         trough_i=trough_i+interval_i.(strcat('T',num2str(trial)))(1)-1;
         try
-                 
-            
-            
-            
-            
-            
             trough_lock(trial_count,:)=data([trough_i-round(plot_time/dt/2): trough_i+round(plot_time/dt/2)],trial);
             trough_powspctrm(trial_count,1,1:size(TFRs{1},1),1:plot_time/dt+1)=TFRs{1}(:,[trough_i-round(plot_time/dt/2): trough_i+round(plot_time/dt/2)],trial);
             betapowerlock(trial_count,:)=mean(TFRs{1}((find(fVec==(betaband(1))):find(fVec-betaband(end)==min(abs(fVec-(betaband(end)))))),trough_i-round(plot_time/dt/2): trough_i+round(plot_time/dt/2),trial),1);
-            alphapowerlock(trial_count,:)=mean(TFRs{1}(find(fVec-alphaband(1)==min(abs(fVec-(alphaband(1))))):find(abs(fVec-alphaband(end))==min(abs(fVec-(alphaband(end))))),trough_i-round(plot_time/dt/2): trough_i+round(plot_time/dt/2),trial),1);
-
-            
-            
-            
-            
-            
-        catch
+            alphapowerlock(trial_count,:)=mean(TFRs{1}(find(fVec-alphaband(1)==min(abs(fVec-(alphaband(1))))):find(abs(fVec-alphaband(end))==min(abs(fVec-(alphaband(end))))),trough_i-round(plot_time/dt/2): trough_i+round(plot_time/dt/2),trial),1);     
+        catch % if interval leaks over data interval
             
             time_oi=[max(1,trough_i-round(plot_time/dt/2)): min(trough_i+round(plot_time/dt/2),length(tVec))];
             if time_oi(1)==1
@@ -375,7 +363,7 @@ for partic=1:length(Partic)
 
 
 
-        %% ryan
+        %% beta
         % from now on, we'll look within 100ms of peak power for trough
         trial=specEv_struct.Events.Events.trialind(event_i_tokeep(trial_count));
             
@@ -409,12 +397,6 @@ for partic=1:length(Partic)
             trough_powspctrm_ryan(trial_count,1,1:size(TFRs{1},1),time_in_mat)=TFRs{1}(:,time_oi,trial);
             betapowerlock_ryan(trial_count,time_in_mat)=mean(TFRs{1}((find(fVec==(betaband(1))):find(fVec-betaband(end)==min(abs(fVec-(betaband(end)))))),time_oi,trial),1);
             alphapowerlock_ryan(trial_count,time_in_mat)=mean(TFRs{1}(find(fVec-alphaband(1)==min(abs(fVec-(alphaband(1))))):find(abs(fVec-alphaband(end))==min(abs(fVec-(alphaband(end))))),time_oi,trial),1);    
-            
-
-            
-            
-            
-            
         end
         subplot(6,2,[2,4])
         hold on
@@ -494,12 +476,6 @@ for partic=1:length(Partic)
 
 
 
-
-
-
-
-
-
     print('-dpng','-r150',strcat('temp','.png'));
     blankSlide = Presentation.SlideMaster.CustomLayouts.Item(7);
     Slide1 = Presentation.Slides.AddSlide(1,blankSlide);
@@ -518,12 +494,15 @@ for partic=1:length(Partic)
 
 
 
-
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %% Plot avg waveforms: beta and rnd
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
     % compare directly
     figure%('units','normalized','outerposition', [0 0 .5 .5]);
-    %remove nan
-%     trough_lock(isnan(trough_lock(:,1)),:)=[];
+    % get SE
     SE_upper=[];
     SE_lower=[];
     for i=1:plot_time/dt+1
@@ -531,7 +510,6 @@ for partic=1:length(Partic)
         SE_upper(i)=nanmean(trough_lock(:,i))+se;
         SE_lower(i)=nanmean(trough_lock(:,i))-se;
     end
-
 
     clf
     hold on
@@ -545,9 +523,8 @@ for partic=1:length(Partic)
     A.FaceColor=colour;
     A.FaceAlpha=.2;
 
-
+    %get SE
     colour=[1 .625 .25];
-%     trough_lock_ryan(isnan(trough_lock_ryan(:,1)),:)=[];
     SE_upper=[];
     SE_lower=[];
     for i=1:plot_time/dt+1
@@ -582,7 +559,7 @@ for partic=1:length(Partic)
     
     
 
-    %% now I want to actually compare the two waveforms (random vs event)
+    %% same thign again but print some numbers (and keep for later)
     %let's look at the width
     for p=1:2
         if p==1 %beta
@@ -681,7 +658,17 @@ for partic=1:length(Partic)
     Image1 = Slide1.Shapes.AddPicture(strcat(cd,'/temp','.png'),'msoFalse','msoTrue',120,0,700,540);%10,20,700,500
 
 
+    
+    
+    
+    
+    
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %% plot TFR of AVG (rahter than avg of tfr)
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 
     figure('units','normalized','outerposition', [0 0 1 1]);
     for p=1:2 %beta or random
@@ -806,8 +793,11 @@ end
 
 
 
-
-
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Plot Grand Average
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 trough_lock=trough_lock_all;
 trough_lock_ryan=trough_lock_ryan_all;
@@ -860,8 +850,12 @@ legend(lines,'Random','Event')
 
 
 
-%% stats
-   disp('Avg over difficulties')
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Let's do some stats
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 [H,P,CI,STATS]=ttest(post_peak_value_all);
 [H,P,CI,STATS]=ttest(prev_peak_value_all);
 [H,P,CI,STATS]=ttest(post_peak_value_ryan_all);
@@ -873,13 +867,8 @@ legend(lines,'Random','Event')
 [H,P,CI,STATS]=ttest(prev_peak_value_all,prev_peak_value_ryan_all)
 
 
-trough_to_peak_amp_ryan_all=[];
-trough_value_ryan_all=[];
-post_peak_value_ryan_all=[];
-prev_peak_value_ryan_all=[];
 
-
-
+%% amp ttest per timepoint
 h=[];
 p=[];
 for i=1:301
@@ -891,25 +880,22 @@ plot([-plot_time/2:dt:plot_time/2],h,'k*')
 
 
 
+% FDR correction
+sort_i={};
+data_length=301
+corrected_p=nan(size(p));
+corrected_abs=nan(size(p));
 
+[sorted_p, sort_i]=sort(p);
 
+for i=1:length(p)-1
+    corrected_p(end-i)= sorted_p(end-i)*data_length/(data_length-i);
+    if sorted_p(end-i)*data_length/(data_length-i) < 0.05
+        corrected_abs(end-i)=1;
+    end
+end
 
-
-    sort_i={};
-    data_length=301
-    corrected_p=nan(size(p));
-    corrected_abs=nan(size(p));
-
-        [sorted_p, sort_i]=sort(p);
-
-            for i=1:length(p)-1
-                corrected_p(end-i)= sorted_p(end-i)*data_length/(data_length-i);
-                if sorted_p(end-i)*data_length/(data_length-i) < 0.05
-                    corrected_abs(end-i)=1;
-                end
-            end
-            
-            h(sort_i)=corrected_abs;
+h(sort_i)=corrected_abs;
 plot([-plot_time/2:dt:plot_time/2],h-1,'r*')
 
 
