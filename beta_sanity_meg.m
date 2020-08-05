@@ -11,6 +11,8 @@ Presentation = h.Presentation.Add;
 alphaband=[8 13];
 betaband=[15 29];
 plot_time =500;
+highestpower=1;
+lowestpower=0;
     
 
 rng('shuffle')
@@ -30,7 +32,7 @@ prev_peak_value_ryan_all=[];
 
 for partic=1:length(Partic)
 
-    clearvars -except partic Partic h Presentation trough_lock_all trough_lock_ryan_all peak_to_peak_latency_all trough_to_peak_amp_all trough_value_all post_peak_value_all prev_peak_value_all peak_to_peak_latency_ryan_all trough_to_peak_amp_ryan_all trough_value_ryan_all post_peak_value_ryan_all prev_peak_value_ryan_all alphaband betaband plot_time
+    clearvars -except partic Partic h Presentation trough_lock_all trough_lock_ryan_all peak_to_peak_latency_all trough_to_peak_amp_all trough_value_all post_peak_value_all prev_peak_value_all peak_to_peak_latency_ryan_all trough_to_peak_amp_ryan_all trough_value_ryan_all post_peak_value_ryan_all prev_peak_value_ryan_all alphaband betaband plot_time highestpower lowestpower
     %% load data
     data_path='F:\Brown\Shin Data\HumanDetection\';
     filename=strcat('prestim_humandetection_subject',num2str(Partic(partic)),'.mat');
@@ -71,11 +73,15 @@ for partic=1:length(Partic)
     tVec_assumed=linspace(1/Fs,1,Fs);
     [specEv_struct,TFRs,X] = spectralevents(eventBand,fVec,Fs,findMethod,vis,X,classLabels);
 
- 
+     fprintf('\n\nPartic: %d \nTrials: %d \nEvents: %d',partic,nr_trials,size(specEv_struct.Events.Events.maximapower,1))
 
     %% take only the N_keep events with highest power
     N_keep=100;
-    [sorted_power, sort_power_i]=sort(specEv_struct.Events.Events.maximapower, 'descend');
+    if highestpower
+        [sorted_power, sort_power_i]=sort(specEv_struct.Events.Events.maximapower, 'descend');
+    elseif lowestpower
+        [sorted_power, sort_power_i]=sort(specEv_struct.Events.Events.maximapower, 'ascend');
+    end
     event_i_tokeep=sort(sort_power_i(1:N_keep));
 
 
@@ -109,178 +115,185 @@ for partic=1:length(Partic)
         interval_i.(strcat('T',num2str(trials_for_rnd(trial))))= [-half_time_interval_per_trial(trials_for_rnd(trial)):half_time_interval_per_trial(trials_for_rnd(trial))]+start(trials_for_rnd(trial));
     end
 
-
-
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %% Plot individual trials and check for beta-rnd proximity
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %% Plot beta peaks and random troughs to see if they overlap
-    % before I usually had an event and a fake one per trial. now I don't.
-    % I'll just plot all the events and if there happens to be a rnd one
-    % I'll plot it, and if not I won't
-    sub_count=0;       
-    figure('units','normalized','outerposition', [0 0 1 1]);
-    %for trial=unique(specEv_struct.Events.Events.trialind)'  
+    %% make sure my rnd isnt' near a beta
+    %did this check as part of the plotting loop before but let's not
+    mingap=100; %at least 50ms between my trough and beta
+    mingap=mingap/dt;
     for trial=1:N_keep
-        this_event_trial=specEv_struct.Events.Events.trialind(event_i_tokeep(trial));
-
-        sub_count=sub_count+1;
-        if sub_count==1
-           clf
-           hold on
-        end
-        subplot(4,1,sub_count)
-            %% plot ryan stuff
-            this_TFR=squeeze(TFRs{1}(find(fVec==(eventBand(1))):find(fVec-eventBand(end)==min(abs(fVec-(eventBand(end))))),:,this_event_trial));
-            imagesc([tVec(1) tVec(end)],eventBand,this_TFR)
-            colormap jet
-            cb = colorbar;         
-            % Overlay locations of event peaks and the waveform corresponding with each trial
-            hold on
-            max_t=specEv_struct.Events.Events.maximatiming(specEv_struct.Events.Events.trialind==this_event_trial);
-            max_f=specEv_struct.Events.Events.maximafreq(specEv_struct.Events.Events.trialind==this_event_trial);
-            max_t_realtime=[];
-            for i=1:length(max_t)
-                max_t_realtime(i)=tVec(find(round(tVec_assumed,3)==round(max_t(i),3)));
-            end
-             plot(max_t_realtime,max_f,'.','Color',[.5 .5 .5],'Markersize',20) %Add points at event maxima
-             
-             
-             % find the event we're actually here for (selected as high
-             % power)
-             max_t=specEv_struct.Events.Events.maximatiming(event_i_tokeep(trial));
-             max_t_realtime=tVec(find(round(tVec_assumed,3)==round(max_t,3)));
-             max_f=specEv_struct.Events.Events.maximafreq(event_i_tokeep(trial));
-                  
-             plot(max_t_realtime,max_f,'w.','Markersize',30) 
-
-            %plot timeseries
-            yyaxis right
-            plot(tVec,X{1}(:,this_event_trial),'w','Linewidth',2)
-
-            title(strcat('Trial ',num2str(this_event_trial)))
-
-
-            %% plot random minima
-            if any(this_event_trial== trials_for_rnd)
-                this_data=data(interval_i.(strcat('T',num2str(this_event_trial))),this_event_trial);
-
-                [trough,trough_i]=min(this_data);
-
-                trough_i=trough_i+interval_i.(strcat('T',num2str(this_event_trial)))(1)-1; 
-
-                %% see if its near beta, redraw a new time
-                while any(abs(max_t_realtime-trough_i)<50) %still use all events to exclude rnd
-                       start(this_event_trial)=randi([ceil(half_time_interval_per_trial(this_event_trial))+1,length(tVec)-ceil(half_time_interval_per_trial(this_event_trial))-1],1,1);
-                       interval_i.(strcat('T',num2str(this_event_trial)))= [-half_time_interval_per_trial(this_event_trial):half_time_interval_per_trial(this_event_trial)]+start(this_event_trial);
-                       %refind trough
-                       this_data=data(interval_i.(strcat('T',num2str(this_event_trial))),this_event_trial);
-                       [trough,trough_i]=min(this_data);
-                       trough_i=trough_i+interval_i.(strcat('T',num2str(this_event_trial)))(1)-1;
-                end
-                
-                trough_i=tVec(trough_i);
-                plot(trough_i,trough,'r.','Markersize',30)   
-            end
-
-                if sub_count==4 | trial==specEv_struct.Events.Events.trialind(end)
-        %             print('-dpng','-r150',strcat('temp','.png'));
-        %             blankSlide = Presentation.SlideMaster.CustomLayouts.Item(7);
-        %             Slide1 = Presentation.Slides.AddSlide(1,blankSlide);
-        %             Image1 = Slide1.Shapes.AddPicture(strcat(cd,'/temp','.png'),'msoFalse','msoTrue',120,0,700,540);%10,20,700,500
-
-                    sub_count=0;
-                end
-
-    end
-    close all    
-
-    
-    %% we just plotted all betas and chucked in a rnd if there was one, now we'll do the opposite just to check
-    sub_count=0;       
-    figure('units','normalized','outerposition', [0 0 1 1]);
-    %for trial=unique(specEv_struct.Events.Events.trialind)'  
-    for trial=1:N_keep
-        this_event_trial=trials_for_rnd(trial);
-
-        sub_count=sub_count+1;
-        if sub_count==1
-           clf
-           hold on
-        end
-        subplot(4,1,sub_count)
-        
-        
-            %% plot ryan stuff
-            this_TFR=squeeze(TFRs{1}(find(fVec==(eventBand(1))):find(fVec-eventBand(end)==min(abs(fVec-(eventBand(end))))),:,this_event_trial));
-            imagesc([tVec(1) tVec(end)],eventBand,this_TFR)
-            colormap jet
-            cb = colorbar;         
-            % Overlay locations of event peaks and the waveform corresponding with each trial
-            hold on
-            max_t=specEv_struct.Events.Events.maximatiming(specEv_struct.Events.Events.trialind==this_event_trial);
-            max_f=specEv_struct.Events.Events.maximafreq(specEv_struct.Events.Events.trialind==this_event_trial);
-            max_t_realtime=[];
-            for i=1:length(max_t)
-                max_t_realtime(i)=tVec(find(round(tVec_assumed,3)==round(max_t(i),3)));
-            end
-             plot(max_t_realtime,max_f,'.','Color',[.5 .5 .5],'Markersize',20) %Add points at event maxima
-             
-             
-             % find the event we're actually here for (if there sis one)
-             if any(this_event_trial== specEv_struct.Events.Events.trialind(event_i_tokeep))
-
-                 max_t=specEv_struct.Events.Events.maximatiming(event_i_tokeep(specEv_struct.Events.Events.trialind(event_i_tokeep)==this_event_trial));
-                 max_t_realtime=[];
-                 for i=1:length(max_t)
-                     max_t_realtime(i)=tVec(find(round(tVec_assumed,3)==round(max_t(i),3)));
-                 end
-                  max_f=specEv_struct.Events.Events.maximafreq(event_i_tokeep(specEv_struct.Events.Events.trialind(event_i_tokeep)==this_event_trial));
-                  
-                plot(max_t_realtime,max_f,'w.','Markersize',30) 
-             end
-
-            %plot timeseries
-            yyaxis right
-            plot(tVec,X{1}(:,this_event_trial),'w','Linewidth',2)
-
-            title(strcat('Trial ',num2str(this_event_trial)))
-
-
-            %% plot random minima
-            this_data=data(interval_i.(strcat('T',num2str(this_event_trial))),this_event_trial);
-
-            [trough,trough_i]=min(this_data);
-
-            trough_i=trough_i+interval_i.(strcat('T',num2str(this_event_trial)))(1)-1; 
-
-            %% see if its near beta, redraw a new time
-            while any(abs(max_t_realtime-trough_i)<50) %still use all events to exclude rnd
+         this_event_trial=trials_for_rnd(trial);
+         this_data=data(interval_i.(strcat('T',num2str(this_event_trial))),this_event_trial);
+         [trough,trough_i]=min(this_data);
+         trough_i=trough_i+interval_i.(strcat('T',num2str(this_event_trial)))(1)-1; 
+         %check if rnd trough is near beta
+         
+         %are there any betas
+         if sum(specEv_struct.Events.Events.trialind==this_event_trial)>0
+             max_beta_times=specEv_struct.Events.Events.maximatiming(specEv_struct.Events.Events.trialind==this_event_trial);
+             max_beta_times_i=find(round(tVec_assumed,4)==round(max_beta_times,4));
+             while any(abs(max_beta_times_i-trough_i)<mingap) 
                    start(this_event_trial)=randi([ceil(half_time_interval_per_trial(this_event_trial))+1,length(tVec)-ceil(half_time_interval_per_trial(this_event_trial))-1],1,1);
                    interval_i.(strcat('T',num2str(this_event_trial)))= [-half_time_interval_per_trial(this_event_trial):half_time_interval_per_trial(this_event_trial)]+start(this_event_trial);
                    %refind trough
                    this_data=data(interval_i.(strcat('T',num2str(this_event_trial))),this_event_trial);
                    [trough,trough_i]=min(this_data);
                    trough_i=trough_i+interval_i.(strcat('T',num2str(this_event_trial)))(1)-1;
+             end
+         end
+    end
+    
+    plot_trials=0
+    if plot_trials
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %% Plot individual trials and check for beta-rnd proximity
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %% Plot beta peaks and random troughs to see if they overlap
+        % before I usually had an event and a fake one per trial. now I don't.
+        % I'll just plot all the events and if there happens to be a rnd one
+        % I'll plot it, and if not I won't
+        sub_count=0;       
+        figure('units','normalized','outerposition', [0 0 1 1]);
+        %for trial=unique(specEv_struct.Events.Events.trialind)'  
+        for trial=1:N_keep
+            this_event_trial=specEv_struct.Events.Events.trialind(event_i_tokeep(trial));
+
+            sub_count=sub_count+1;
+            if sub_count==1
+               clf
+               hold on
             end
+            subplot(4,1,sub_count)
+                %% plot ryan stuff
+                this_TFR=squeeze(TFRs{1}(find(fVec==(eventBand(1))):find(fVec-eventBand(end)==min(abs(fVec-(eventBand(end))))),:,this_event_trial));
+                imagesc([tVec(1) tVec(end)],eventBand,this_TFR)
+                colormap jet
+                cb = colorbar;         
+                % Overlay locations of event peaks and the waveform corresponding with each trial
+                hold on
+                max_t=specEv_struct.Events.Events.maximatiming(specEv_struct.Events.Events.trialind==this_event_trial);
+                max_f=specEv_struct.Events.Events.maximafreq(specEv_struct.Events.Events.trialind==this_event_trial);
+                max_t_realtime=[];
+                for i=1:length(max_t)
+                    max_t_realtime(i)=tVec(find(round(tVec_assumed,3)==round(max_t(i),3)));
+                end
+                 plot(max_t_realtime,max_f,'.','Color',[.5 .5 .5],'Markersize',20) %Add points at event maxima
 
-            trough_i=tVec(trough_i);
-            plot(trough_i,trough,'r.','Markersize',30)   
+
+                 % find the event we're actually here for (selected as high
+                 % power)
+                 max_t=specEv_struct.Events.Events.maximatiming(event_i_tokeep(trial));
+                 max_t_realtime=tVec(find(round(tVec_assumed,3)==round(max_t,3)));
+                 max_f=specEv_struct.Events.Events.maximafreq(event_i_tokeep(trial));
+
+                 plot(max_t_realtime,max_f,'w.','Markersize',30) 
+
+                %plot timeseries
+                yyaxis right
+                plot(tVec,X{1}(:,this_event_trial),'w','Linewidth',2)
+
+                title(strcat('Trial ',num2str(this_event_trial)))
 
 
-                if sub_count==4 | trial==specEv_struct.Events.Events.trialind(end)
-        %             print('-dpng','-r150',strcat('temp','.png'));
-        %             blankSlide = Presentation.SlideMaster.CustomLayouts.Item(7);
-        %             Slide1 = Presentation.Slides.AddSlide(1,blankSlide);
-        %             Image1 = Slide1.Shapes.AddPicture(strcat(cd,'/temp','.png'),'msoFalse','msoTrue',120,0,700,540);%10,20,700,500
+                %% plot random minima
+                if any(this_event_trial== trials_for_rnd)
+                    this_data=data(interval_i.(strcat('T',num2str(this_event_trial))),this_event_trial);
 
-                    sub_count=0;
+                    [trough,trough_i]=min(this_data);
+
+                    trough_i=trough_i+interval_i.(strcat('T',num2str(this_event_trial)))(1)-1; 
+
+                    trough_i=tVec(trough_i);
+                    plot(trough_i,trough,'r.','Markersize',30)   
                 end
 
+                    if sub_count==4 | trial==specEv_struct.Events.Events.trialind(end)
+            %             print('-dpng','-r150',strcat('temp','.png'));
+            %             blankSlide = Presentation.SlideMaster.CustomLayouts.Item(7);
+            %             Slide1 = Presentation.Slides.AddSlide(1,blankSlide);
+            %             Image1 = Slide1.Shapes.AddPicture(strcat(cd,'/temp','.png'),'msoFalse','msoTrue',120,0,700,540);%10,20,700,500
+
+                        sub_count=0;
+                    end
+
+        end
+        close all    
+
+
+        %% we just plotted all betas and chucked in a rnd if there was one, now we'll do the opposite just to check
+        sub_count=0;       
+        figure('units','normalized','outerposition', [0 0 1 1]);
+        %for trial=unique(specEv_struct.Events.Events.trialind)'  
+        for trial=1:N_keep
+            this_event_trial=trials_for_rnd(trial);
+
+            sub_count=sub_count+1;
+            if sub_count==1
+               clf
+               hold on
+            end
+            subplot(4,1,sub_count)
+
+
+                %% plot ryan stuff
+                this_TFR=squeeze(TFRs{1}(find(fVec==(eventBand(1))):find(fVec-eventBand(end)==min(abs(fVec-(eventBand(end))))),:,this_event_trial));
+                imagesc([tVec(1) tVec(end)],eventBand,this_TFR)
+                colormap jet
+                cb = colorbar;         
+                % Overlay locations of event peaks and the waveform corresponding with each trial
+                hold on
+                max_t=specEv_struct.Events.Events.maximatiming(specEv_struct.Events.Events.trialind==this_event_trial);
+                max_f=specEv_struct.Events.Events.maximafreq(specEv_struct.Events.Events.trialind==this_event_trial);
+                max_t_realtime=[];
+                for i=1:length(max_t)
+                    max_t_realtime(i)=tVec(find(round(tVec_assumed,3)==round(max_t(i),3)));
+                end
+                 plot(max_t_realtime,max_f,'.','Color',[.5 .5 .5],'Markersize',20) %Add points at event maxima
+
+
+                 % find the event we're actually here for (if there sis one)
+                 if any(this_event_trial== specEv_struct.Events.Events.trialind(event_i_tokeep))
+
+                     max_t=specEv_struct.Events.Events.maximatiming(event_i_tokeep(specEv_struct.Events.Events.trialind(event_i_tokeep)==this_event_trial));
+                     max_t_realtime=[];
+                     for i=1:length(max_t)
+                         max_t_realtime(i)=tVec(find(round(tVec_assumed,3)==round(max_t(i),3)));
+                     end
+                      max_f=specEv_struct.Events.Events.maximafreq(event_i_tokeep(specEv_struct.Events.Events.trialind(event_i_tokeep)==this_event_trial));
+
+                    plot(max_t_realtime,max_f,'w.','Markersize',30) 
+                 end
+
+                %plot timeseries
+                yyaxis right
+                plot(tVec,X{1}(:,this_event_trial),'w','Linewidth',2)
+
+                title(strcat('Trial ',num2str(this_event_trial)))
+
+
+                %% plot random minima
+                this_data=data(interval_i.(strcat('T',num2str(this_event_trial))),this_event_trial);
+
+                [trough,trough_i]=min(this_data);
+
+                trough_i=trough_i+interval_i.(strcat('T',num2str(this_event_trial)))(1)-1; 
+
+                trough_i=tVec(trough_i);
+                plot(trough_i,trough,'r.','Markersize',30)   
+
+
+                    if sub_count==4 | trial==specEv_struct.Events.Events.trialind(end)
+            %             print('-dpng','-r150',strcat('temp','.png'));
+            %             blankSlide = Presentation.SlideMaster.CustomLayouts.Item(7);
+            %             Slide1 = Presentation.Slides.AddSlide(1,blankSlide);
+            %             Image1 = Slide1.Shapes.AddPicture(strcat(cd,'/temp','.png'),'msoFalse','msoTrue',120,0,700,540);%10,20,700,500
+
+                        sub_count=0;
+                    end
+
+        end
+        close all    
     end
-    close all    
 
 
 
@@ -532,7 +545,7 @@ for partic=1:length(Partic)
         SE_upper(i)=nanmean(trough_lock_ryan(:,i))+se;
         SE_lower(i)=nanmean(trough_lock_ryan(:,i))-se;
     end
-    lines(2)=plot(-plot_time/2:dt:plot_time/2, mean(trough_lock_ryan),'Linewidth',2,'Color', colour);
+    lines(2)=plot(-plot_time/2:dt:plot_time/2, nanmean(trough_lock_ryan),'Linewidth',2,'Color', colour);
     %error bars
     tempx=[[-plot_time/2:dt:plot_time/2],fliplr([-plot_time/2:dt:plot_time/2])];
     tempy=[SE_upper,fliplr(SE_lower)];
@@ -802,7 +815,7 @@ end
 trough_lock=trough_lock_all;
 trough_lock_ryan=trough_lock_ryan_all;
 % compare directly
-figure%('units','normalized','outerposition', [0 0 .5 .5]);
+figure('units','normalized','outerposition', [0 0 1 1]);
 %remove nan
 trough_lock(isnan(trough_lock(:,1)),:)=[];
 SE_upper=[];
@@ -847,6 +860,7 @@ A.FaceAlpha=.2;
 ylims=ylim;
 
 legend(lines,'Random','Event')
+grandavgy=ylim;
 
 
 
@@ -877,9 +891,9 @@ for i=1:length(trough_lock_all)
     [h(i),p(i),CI,STATS]=ttest(trough_lock_all(:,i),trough_lock_ryan_all(:,i));
 end
 h(h==0)=nan;
-h(h==1)=0;
-plot([-plot_time/2:dt:plot_time/2],h,'k*')
-
+h(h==1)=grandavgy(1);
+plot([-plot_time/2:dt:plot_time/2],h,'.','Color',[.4 .4 .4])
+title('Amp')
 
 
 % FDR correction
@@ -898,8 +912,9 @@ for i=1:length(p)-1
 end
 
 h(sort_i)=corrected_abs;
-plot([-plot_time/2:dt:plot_time/2],h-1,'r*')
-
+h(h==1)=grandavgy(1);
+plot([-plot_time/2:dt:plot_time/2],h,'k.','Markersize',20)
+legend(lines,'Random','Event')
 print('-dpng','-r150',strcat('temp','.png'));
 blankSlide = Presentation.SlideMaster.CustomLayouts.Item(7);
 Slide1 = Presentation.Slides.AddSlide(1,blankSlide);
@@ -926,8 +941,56 @@ for i=slope_int/2/dt+1:length(trough_lock_all)-slope_int/dt/2-1
 end
 
 h(h==0)=nan;
-h(h==1)=0;
-plot([-plot_time/2:dt:plot_time/2],h,'k*')
+h(h==1)=grandavgy(1);
+
+% compare directly
+figure('units','normalized','outerposition', [0 0 1 1]);
+%remove nan
+trough_lock(isnan(trough_lock(:,1)),:)=[];
+SE_upper=[];
+SE_lower=[];
+for i=1:plot_time/dt+1
+    se=std(trough_lock(:,i))./sqrt(length(trough_lock(:,i)));
+    SE_upper(i)=mean(trough_lock(:,i))+se;
+    SE_lower(i)=mean(trough_lock(:,i))-se;
+end
+
+
+clf
+hold on
+colour=[.25 .625 1];
+lines(1)=plot(-plot_time/2:dt:plot_time/2, mean(trough_lock),'Linewidth',2,'Color', colour);
+%error bars
+tempx=[[-plot_time/2:dt:plot_time/2],fliplr([-plot_time/2:dt:plot_time/2])];
+tempy=[SE_upper,fliplr(SE_lower)];
+A=fill(tempx,tempy,'k');
+A.EdgeColor=colour;
+A.FaceColor=colour;
+A.FaceAlpha=.2;
+
+
+colour=[1 .625 .25];
+trough_lock_ryan(isnan(trough_lock_ryan(:,1)),:)=[];
+SE_upper=[];
+SE_lower=[];
+for i=1:plot_time/dt+1
+    se=std(trough_lock_ryan(:,i))./sqrt(length(trough_lock_ryan(:,i)));
+    SE_upper(i)=mean(trough_lock_ryan(:,i))+se;
+    SE_lower(i)=mean(trough_lock_ryan(:,i))-se;
+end
+lines(2)=plot(-plot_time/2:dt:plot_time/2, mean(trough_lock_ryan),'Linewidth',2,'Color', colour);
+%error bars
+tempx=[[-plot_time/2:dt:plot_time/2],fliplr([-plot_time/2:dt:plot_time/2])];
+tempy=[SE_upper,fliplr(SE_lower)];
+A=fill(tempx,tempy,'k');
+A.EdgeColor=colour;
+A.FaceColor=colour;
+A.FaceAlpha=.2;
+ylims=ylim;
+
+legend(lines,'Random','Event')
+title('Slope')
+plot([-plot_time/2:dt:plot_time/2],h,'.','Color',[.4 .4 .4])
 
 
 
@@ -947,5 +1010,13 @@ for i=1:length(p)-1
 end
 
 h(sort_i)=corrected_abs;
-plot([-plot_time/2:dt:plot_time/2],h-1,'g*')
+h(h==1)=grandavgy(1);
+plot([-plot_time/2:dt:plot_time/2],h,'k.','Markersize',20)
+legend(lines,'Random','Event')
+
+print('-dpng','-r150',strcat('temp','.png'));
+blankSlide = Presentation.SlideMaster.CustomLayouts.Item(7);
+Slide1 = Presentation.Slides.AddSlide(1,blankSlide);
+Image1 = Slide1.Shapes.AddPicture(strcat(cd,'/temp','.png'),'msoFalse','msoTrue',120,0,700,540);%10,20,700,500
+
     
