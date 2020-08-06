@@ -482,7 +482,7 @@ end
 trough_lock_low=trough_lock_low_all;
 trough_lock_high=trough_lock_high_all;
 % compare directly
-figure('units','normalized','outerposition', [0 0 1 1]);
+figure%('units','normalized','outerposition', [0 0 1 1]);
 %remove nan
 trough_lock_low(isnan(trough_lock_low(:,1)),:)=[];
 SE_upper=[];
@@ -526,7 +526,7 @@ A.FaceColor=colour;
 A.FaceAlpha=.2;
 ylims=ylim;
 
-legend(lines,'Random','Event')
+legend(lines,'Low','High')
 grandavgy=ylim;
 
 
@@ -611,7 +611,7 @@ h(h==0)=nan;
 h(h==1)=grandavgy(1);
 
 % compare directly
-figure('units','normalized','outerposition', [0 0 1 1]);
+figure%('units','normalized','outerposition', [0 0 1 1]);
 %remove nan
 trough_lock_low(isnan(trough_lock_low(:,1)),:)=[];
 SE_upper=[];
