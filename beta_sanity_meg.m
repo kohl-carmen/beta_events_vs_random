@@ -664,7 +664,8 @@ for partic=1:length(Partic)
 %         tx.FontSize=10;
     end
 
-
+    xlim([-plot_time/2 plot_time/2])
+    
     print('-dpng','-r150',strcat('temp','.png'));
     blankSlide = Presentation.SlideMaster.CustomLayouts.Item(7);
     Slide1 = Presentation.Slides.AddSlide(1,blankSlide);
@@ -793,7 +794,11 @@ for partic=1:length(Partic)
     trough_lock_all(partic,:)=nanmean(trough_lock);
     trough_lock_ryan_all(partic,:)=nanmean(trough_lock_ryan);
 end
-
+% cd('F:\Brown\Beta_v_Rnd')
+% rnd_50=trough_lock_all;
+% beta_low_50=trough_lock_ryan_all;
+% save('rnd_50','rnd_50')
+% save('beta_low_50','beta_low_50')
 
 
 

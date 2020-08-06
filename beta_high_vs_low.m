@@ -412,17 +412,17 @@ for partic=1:length(Partic)
     end
 
     if p==1
-        peak_to_peak_latency_ryan_all(partic)=nanmean(peak_to_peak_latency);
-        trough_to_peak_amp_ryan_all(partic)=nanmean(trough_to_peak_amp);
-        trough_value_ryan_all(partic)=nanmean(trough_value);
-        post_peak_value_ryan_all(partic)=nanmean(post_peak_value);
-        prev_peak_value_ryan_all(partic)=nanmean(prev_peak_value);
+        peak_to_peak_latency_high_all(partic)=nanmean(peak_to_peak_latency);
+        trough_to_peak_amp_high_all(partic)=nanmean(trough_to_peak_amp);
+        trough_value_high_all(partic)=nanmean(trough_value);
+        post_peak_value_high_all(partic)=nanmean(post_peak_value);
+        prev_peak_value_high_all(partic)=nanmean(prev_peak_value);
     else
-        peak_to_peak_latency_all(partic)=nanmean(peak_to_peak_latency);
-        trough_to_peak_amp_all(partic)=nanmean(trough_to_peak_amp);
-        trough_value_all(partic)=nanmean(trough_value);
-        post_peak_value_all(partic)=nanmean(post_peak_value);
-        prev_peak_value_all(partic)=nanmean(prev_peak_value);
+        peak_to_peak_latency_low_all(partic)=nanmean(peak_to_peak_latency);
+        trough_to_peak_amp_low_all(partic)=nanmean(trough_to_peak_amp);
+        trough_value_low_all(partic)=nanmean(trough_value);
+        post_peak_value_low_all(partic)=nanmean(post_peak_value);
+        prev_peak_value_low_all(partic)=nanmean(prev_peak_value);
     end
 
     xtext=sprintf(['Peak2Peak-Lat:  %2.2f (%2.2f) \n'...
@@ -448,7 +448,7 @@ for partic=1:length(Partic)
 %         tx.FontSize=10;
     end
 
-
+    xlim([-plot_time/2 plot_time/2])
     print('-dpng','-r150',strcat('temp','.png'));
     blankSlide = Presentation.SlideMaster.CustomLayouts.Item(7);
     Slide1 = Presentation.Slides.AddSlide(1,blankSlide);
@@ -464,7 +464,7 @@ for partic=1:length(Partic)
     trough_lock_low_all(partic,:)=nanmean(trough_lock_low);
     trough_lock_high_all(partic,:)=nanmean(trough_lock_high);
 end
-
+close all
 
 
 
@@ -538,17 +538,24 @@ grandavgy=ylim;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % are all positive peaks greater than 0?
-[H,P,CI,STATS]=ttest(post_peak_value_all);
-[H,P,CI,STATS]=ttest(prev_peak_value_all);
-[H,P,CI,STATS]=ttest(post_peak_value_ryan_all);
-[H,P,CI,STATS]=ttest(prev_peak_value_ryan_all);
+[H,P,CI,STATS]=ttest(post_peak_value_low_all);
+[H,P,CI,STATS]=ttest(prev_peak_value_low_all);
+[H,P,CI,STATS]=ttest(post_peak_value_high_all);
+[H,P,CI,STATS]=ttest(prev_peak_value_high_all);
  
 %compare beta and rnd summary stats
-[H,P,CI,STATS]=ttest(peak_to_peak_latency_all,peak_to_peak_latency_ryan_all)
-[H,P,CI,STATS]=ttest(trough_to_peak_amp_all,trough_to_peak_amp_ryan_all)
-[H,P,CI,STATS]=ttest(trough_value_all,trough_value_ryan_all)
-[H,P,CI,STATS]=ttest(prev_peak_value_all,prev_peak_value_ryan_all)
+[H_p2p,P,CI,STATS]=ttest(peak_to_peak_latency_low_all,peak_to_peak_latency_high_all);
+[H_t2p,P,CI,STATS]=ttest(trough_to_peak_amp_low_all,trough_to_peak_amp_high_all);
+[H_t,P,CI,STATS]=ttest(trough_value_low_all,trough_value_high_all);
+[H_prevpeak,P,CI,STATS]=ttest(prev_peak_value_low_all,prev_peak_value_high_all);
+[H_postpeak,P,CI,STATS]=ttest(post_peak_value_low_all,post_peak_value_high_all);
 
+xtext=sprintf('Differences detected:\nPeak2Peak: %d\nTrough2Peak: %d\nTrough: %d\nPeak1: %d\nPeak2: %d ',H_p2p,H_t2p,H_t,H_prevpeak,H_postpeak);
+tx=text(-plot_time/2+(plot_time/10),ylims(1)+(ylims(2)-ylims(1))/100*40,xtext );
+
+tx.Color=[.5 .5 .5];
+tx.FontWeight='bold';
+tx.FontSize=10;
 
 
 %% amp ttest per timepoint
@@ -558,9 +565,8 @@ for i=1:length(trough_lock_low_all)
     [h(i),p(i),CI,STATS]=ttest(trough_lock_low_all(:,i),trough_lock_high_all(:,i));
 end
 h(h==0)=nan;
-h(h==1)=grandavgy(1);
-plot([-plot_time/2:dt:plot_time/2],h,'.','Color',[.4 .4 .4])
-title('Amp')
+h(h==1)=grandavgy(1)+((grandavgy(2)-grandavgy(1))/100*5);
+plot([-plot_time/2:dt:plot_time/2],h,'.','Color',[.8 .8 .8])
 
 
 % FDR correction
@@ -579,14 +585,15 @@ for i=1:length(p)-1
 end
 
 h(sort_i)=corrected_abs;
-h(h==1)=grandavgy(1);
-plot([-plot_time/2:dt:plot_time/2],h,'k.','Markersize',20)
-legend(lines,'Low','High')
-print('-dpng','-r150',strcat('temp','.png'));
-blankSlide = Presentation.SlideMaster.CustomLayouts.Item(7);
-Slide1 = Presentation.Slides.AddSlide(1,blankSlide);
-Image1 = Slide1.Shapes.AddPicture(strcat(cd,'/temp','.png'),'msoFalse','msoTrue',120,0,700,540);%10,20,700,500
+h(h==1)=grandavgy(1)+((grandavgy(2)-grandavgy(1))/100*5);
+plot([-plot_time/2:dt:plot_time/2],h,'.','Markersize',20,'Color',[.4 .4 .4])
 
+
+tx=text(-plot_time/2+1,grandavgy(1)+((grandavgy(2)-grandavgy(1))/100*5),'Amplitude' );
+tx.Color=[.4 .4 .4];
+tx.FontWeight='bold';
+tx.FontSize=10;
+legend(lines,'Low','High')
 
 %% slope ttest per timepoint
 
@@ -608,56 +615,8 @@ for i=slope_int/2/dt+1:length(trough_lock_low_all)-slope_int/dt/2-1
 end
 
 h(h==0)=nan;
-h(h==1)=grandavgy(1);
-
-% compare directly
-figure%('units','normalized','outerposition', [0 0 1 1]);
-%remove nan
-trough_lock_low(isnan(trough_lock_low(:,1)),:)=[];
-SE_upper=[];
-SE_lower=[];
-for i=1:plot_time/dt+1
-    se=std(trough_lock_low(:,i))./sqrt(length(trough_lock_low(:,i)));
-    SE_upper(i)=mean(trough_lock_low(:,i))+se;
-    SE_lower(i)=mean(trough_lock_low(:,i))-se;
-end
-
-
-clf
-hold on
-colour=[.25 .625 1];
-lines(1)=plot(-plot_time/2:dt:plot_time/2, mean(trough_lock_low),'Linewidth',2,'Color', colour);
-%error bars
-tempx=[[-plot_time/2:dt:plot_time/2],fliplr([-plot_time/2:dt:plot_time/2])];
-tempy=[SE_upper,fliplr(SE_lower)];
-A=fill(tempx,tempy,'k');
-A.EdgeColor=colour;
-A.FaceColor=colour;
-A.FaceAlpha=.2;
-
-
-colour=[1 .625 .25];
-trough_lock_high(isnan(trough_lock_high(:,1)),:)=[];
-SE_upper=[];
-SE_lower=[];
-for i=1:plot_time/dt+1
-    se=std(trough_lock_high(:,i))./sqrt(length(trough_lock_high(:,i)));
-    SE_upper(i)=mean(trough_lock_high(:,i))+se;
-    SE_lower(i)=mean(trough_lock_high(:,i))-se;
-end
-lines(2)=plot(-plot_time/2:dt:plot_time/2, mean(trough_lock_high),'Linewidth',2,'Color', colour);
-%error bars
-tempx=[[-plot_time/2:dt:plot_time/2],fliplr([-plot_time/2:dt:plot_time/2])];
-tempy=[SE_upper,fliplr(SE_lower)];
-A=fill(tempx,tempy,'k');
-A.EdgeColor=colour;
-A.FaceColor=colour;
-A.FaceAlpha=.2;
-ylims=ylim;
-
-legend(lines,'Random','Event')
-title('Slope')
-plot([-plot_time/2:dt:plot_time/2],h,'.','Color',[.4 .4 .4])
+h(h==1)=grandavgy(1)+((grandavgy(2)-grandavgy(1))/100*10);
+plot([-plot_time/2:dt:plot_time/2],h,'.','Color',[.8 .8 .8])
 
 
 
@@ -676,10 +635,18 @@ for i=1:length(p)-1
     end
 end
 
+
 h(sort_i)=corrected_abs;
-h(h==1)=grandavgy(1);
-plot([-plot_time/2:dt:plot_time/2],h,'k.','Markersize',20)
+h(h==1)=grandavgy(1)+((grandavgy(2)-grandavgy(1))/100*10);
+plot([-plot_time/2:dt:plot_time/2],h,'.','Markersize',20,'Color',[.2 .2 .2])
 legend(lines,'Low','High')
+
+tx=text(-plot_time/2+1,grandavgy(1)+((grandavgy(2)-grandavgy(1))/100*10),'Slope' );
+tx.Color=[.2 .2 .2];
+tx.FontWeight='bold';
+tx.FontSize=10;
+
+xlim([-plot_time/2 plot_time/2])
 
 print('-dpng','-r150',strcat('temp','.png'));
 blankSlide = Presentation.SlideMaster.CustomLayouts.Item(7);
