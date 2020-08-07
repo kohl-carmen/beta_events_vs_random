@@ -11,7 +11,8 @@ high=beta_high_50;
 low=beta_low_50;
 
 plot_time=500;
-dt=1000/600;
+Fs=600;
+dt=1000/Fs;
 tVec=[-plot_time/2:dt:plot_time/2];
 Conds={'rnd','low','high'};
 
@@ -97,9 +98,68 @@ xlim([-plot_time/2 plot_time/2])
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Plot 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+figure%('units','normalized','outerposition', [0 0 1 1]);
+for partic=1:size(rnd,1)
+    clf
+    hold on
+    colours={[.25 .625 1], [1 .75 .5],[216 72 0]/250};
+    tempx=[[-plot_time/2:dt:plot_time/2],fliplr([-plot_time/2:dt:plot_time/2])];
+
+    for conds=1:length(Conds)
+        data=eval(Conds{conds});
+        lines(conds)=plot(-plot_time/2:dt:plot_time/2, data(partic,:),'Linewidth',2,'Color', colours{conds});
+    end
+
+    legend(lines,'Rnd','Low','High')
+    xlim([-plot_time/2 plot_time/2])
+    title(strcat('Partic',num2str(partic)))
+    
+    print('-dpng','-r150',strcat('temp','.png'));
+    blankSlide = Presentation.SlideMaster.CustomLayouts.Item(7);
+    Slide1 = Presentation.Slides.AddSlide(1,blankSlide);
+    Image1 = Slide1.Shapes.AddPicture(strcat(cd,'/temp','.png'),'msoFalse','msoTrue',120,0,700,540);%10,20,700,500
+
+end
+close all
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ANOVA per timepoint
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% first plot again
+
+figure%('units','normalized','outerposition', [0 0 1 1])
+errorbars=1;
+clf
+hold on
+colours={[.25 .625 1], [1 .75 .5],[216 72 0]/250};
+tempx=[[-plot_time/2:dt:plot_time/2],fliplr([-plot_time/2:dt:plot_time/2])];
+for conds=1:length(Conds)
+    lines(conds)=plot(-plot_time/2:dt:plot_time/2, mean(eval(Conds{conds})),'Linewidth',2,'Color', colours{conds});
+    %error bars
+    if errorbars
+        if conds==1
+            tempy=[SE_rnd_upper,fliplr(SE_rnd_lower)];
+        elseif conds==2
+            tempy=[SE_low_upper,fliplr(SE_low_lower)];
+        elseif conds==3
+            tempy=[SE_high_upper,fliplr(SE_high_lower)];
+        end
+        A=fill(tempx,tempy,'k');
+        A.EdgeColor=colours{conds};
+        A.FaceColor=colours{conds};
+        A.FaceAlpha=.2;
+    end
+end
+
+legend(lines,'Rnd','Low','High')   
+xlim([-plot_time/2 plot_time/2])
+
+%% now stats
 % what are we testing?
 TEST={'Amp','Slope'};
 test=1;
@@ -287,6 +347,305 @@ Image1 = Slide1.Shapes.AddPicture(strcat(cd,'/temp','.png'),'msoFalse','msoTrue'
                         
 
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Summary stats
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% let's see when each changes direction?
+
+%% let's just look at the fourier transform
+figure
+hold on
+
+skip_high_outliers=0;
+match_ylim=0;
+name='';
+colours={[.25 .625 1], [1 .75 .5],[216 72 0]/250};
+for conds=1:length(Conds)
+    subplot(3,1,conds)
+    hold on
+    power=[];
+    data=eval(Conds{conds});
+    for partic=1:(size(rnd,1))
+        if skip_high_outliers & (partic==2 | partic==3| partic==6)
+            if isempty(name)
+                name=strcat(name,'- outliers skipped ');
+            end
+        else
+            x=data(partic,:);
+            fs=600;
+            y = fft(x);
+            n = length(x);          % number of samples
+            f = (0:n-1)*(fs/n);     % frequency range
+            power(partic,:) = abs(y).^2/n;    % power of the DFT
+            plot(f,power,'Linewidth',2,'Color',colours{conds})
+            xlim([0 50])
+        end
+    end
+end
+if match_ylim
+    name=strcat(name,'- Y fixed ');
+    high_ylim=ylim;
+    subplot(3,1,1)
+    ylim(high_ylim)
+    subplot(3,1,2)
+    ylim(high_ylim)
+end
+subplot(3,1,1)
+title(strcat('Freq',name))
+
+print('-dpng','-r150',strcat('temp','.png'));
+blankSlide = Presentation.SlideMaster.CustomLayouts.Item(7);
+Slide1 = Presentation.Slides.AddSlide(1,blankSlide);
+Image1 = Slide1.Shapes.AddPicture(strcat(cd,'/temp','.png'),'msoFalse','msoTrue',120,0,700,540);%10,20,700,500
+
+               
+
+
+%% now TFR of Avg
+figure('units','normalized','outerposition', [0 0 1 1]);
+match_clim=0;
+name='';
+fVec=3:3:30;
+colours={[.25 .625 1], [1 .75 .5],[216 72 0]/250};
+for conds=1:length(Conds)
+    data=eval(Conds{conds});
+    subplot(2,3,conds)
+    hold on    
+    plot([-plot_time/2:dt:plot_time/2],mean(data),'Color',colours{conds},'Linewidth',2)
+    xlim([-plot_time/2 plot_time/2])   
+    
+    subplot(2,3,conds+3)
+    hold on
+    S=mean(data);
+    B = zeros(length(fVec),size(S,2)); 
+    width=7;
+    for i=1:size(S,1)          
+        for j=1:length(fVec)
+            f=fVec(j);
+            s=detrend(S(i,:));
+            dt_s = 1/Fs;
+            sf = f/width;
+            st = 1/(2*pi*sf);
+            t=-3.5*st:dt_s:3.5*st;
+            A = 1/(st*sqrt(2*pi));
+            m = A*exp(-t.^2/(2*st^2)).*exp(1i*2*pi*f.*t);
+            y = conv(s,m);
+            y = 2*(dt_s*abs(y)).^2;
+            y = y(ceil(length(m)/2):length(y)-floor(length(m)/2));
+            B(j,:) = y + B(j,:);
+        end
+    end
+    TFR = B/size(S,1);     
+    imagesc([-plot_time/2:dt:plot_time/2],fVec,TFR)
+    ylim([fVec(1),fVec(end)])
+    xlim([-plot_time/2 plot_time/2]);
+    title(Conds{conds})    
+    xlim([-plot_time/2,plot_time/2])
+    cbar
+end
+if match_clim
+    subplot(2,3,6)
+    name=strcat(name,'- C fixed ');
+    title(strcat(Conds{conds},name))
+    high_clim=caxis;
+    subplot(2,3,4)
+    title(strcat(Conds{1},name))
+    caxis(high_clim)
+    subplot(2,3,5)
+    title(strcat(Conds{2},name))
+    caxis(high_clim)
+end
+   
+print('-dpng','-r150',strcat('temp','.png'));
+blankSlide = Presentation.SlideMaster.CustomLayouts.Item(7);
+Slide1 = Presentation.Slides.AddSlide(1,blankSlide);
+Image1 = Slide1.Shapes.AddPicture(strcat(cd,'/temp','.png'),'msoFalse','msoTrue',120,0,700,540);%10,20,700,500
+close all
 
 
 
+
+
+
+
+
+%% AVG of TFR
+figure('units','normalized','outerposition', [0 0 1 1]);
+match_clim=1;
+name='';
+fVec=3:3:30;
+colours={[.25 .625 1], [1 .75 .5],[216 72 0]/250};
+for conds=1:length(Conds)
+    data=eval(Conds{conds});
+    subplot(2,3,conds)
+    hold on    
+    plot([-plot_time/2:dt:plot_time/2],mean(data),'Color',colours{conds},'Linewidth',2)
+    xlim([-plot_time/2 plot_time/2])   
+    
+    subplot(2,3,conds+3)
+    hold on
+    TFR=nan(length(fVec),length(rnd),size(rnd,1));
+    for partic=1:size(rnd,1)
+        S=data(partic,:);
+        B = zeros(length(fVec),size(S,2)); 
+        width=7;
+        for i=1:size(S,1)          
+            for j=1:length(fVec)
+                f=fVec(j);
+                s=detrend(S(i,:));
+                dt_s = 1/Fs;
+                sf = f/width;
+                st = 1/(2*pi*sf);
+                t=-3.5*st:dt_s:3.5*st;
+                A = 1/(st*sqrt(2*pi));
+                m = A*exp(-t.^2/(2*st^2)).*exp(1i*2*pi*f.*t);
+                y = conv(s,m);
+                y = 2*(dt_s*abs(y)).^2;
+                y = y(ceil(length(m)/2):length(y)-floor(length(m)/2));
+                B(j,:) = y + B(j,:);
+            end
+        end
+        TFR(:,:,partic) = B/size(S,1);    
+    end
+    TFR=mean(TFR,3);
+    imagesc([-plot_time/2:dt:plot_time/2],fVec,TFR)
+    ylim([fVec(1),fVec(end)])
+    xlim([-plot_time/2 plot_time/2]);
+    title(Conds{conds})    
+    xlim([-plot_time/2,plot_time/2])
+    cbar
+end
+if match_clim
+    subplot(2,3,6)
+    name=strcat(name,'- C fixed ');
+    title(strcat(Conds{conds},name))
+    high_clim=caxis;
+    subplot(2,3,4)
+    title(strcat(Conds{1},name))
+    caxis(high_clim)
+    subplot(2,3,5)
+    title(strcat(Conds{2},name))
+    caxis(high_clim)
+end
+   
+print('-dpng','-r150',strcat('temp','.png'));
+blankSlide = Presentation.SlideMaster.CustomLayouts.Item(7);
+Slide1 = Presentation.Slides.AddSlide(1,blankSlide);
+Image1 = Slide1.Shapes.AddPicture(strcat(cd,'/temp','.png'),'msoFalse','msoTrue',120,0,700,540);%10,20,700,500
+close all
+
+
+
+
+%% now TFR of Avg but delete trough
+figure('units','normalized','outerposition', [0 0 1 1]);
+match_clim=1;
+name='';
+fVec=3:3:30;
+colours={[.25 .625 1], [1 .75 .5],[216 72 0]/250};
+
+for conds=1:length(Conds)
+    subplot(2,3,conds)
+    hold on
+    data=mean(eval(Conds{conds}));
+    plot(tVec,data,'Color',colours{conds},'Linewidth',1)
+
+    %find prev and post peaks
+    trough_latency=find(tVec==0);
+    trough_value=data(trough_latency);
+    %from here, find peaks
+    % firs time it changes direction to down I guessbackwards
+    found_peak=0;
+    temp=0;
+    while found_peak==0
+        temp=temp+1;
+        latency=trough_latency-temp;
+        if data(latency)<data(latency+1)
+            prev_peak_latency=latency+1;
+            prev_peak_value=data(prev_peak_latency);
+            found_peak=1;
+        end
+    end
+    %forwards
+    found_peak=0;
+    temp=0;
+    while found_peak==0
+        temp=temp+1;
+        latency=trough_latency+temp;
+        if data(latency)<data(latency-1)
+            post_peak_latency=latency-1;
+            post_peak_value=data(post_peak_latency);
+            found_peak=1;
+        end
+    end
+
+    %apply movign avg between the peaks
+    %increase moving avg window as we approach the trough
+    trough_period=[prev_peak_latency+5:post_peak_latency-5];
+    halfway=floor(length(trough_period)/2);
+    movingavg=[2 10];
+    movingavg=round(linspace(movingavg(1),movingavg(2),halfway));
+    movingavg=[movingavg,sort(movingavg,'descend')];
+    if length(movingavg)<length(trough_period)
+        movingavg(end+1)=movingavg(1);
+    end
+    for rounds=1:3
+        count=0;
+        for i=trough_period
+            count=count+1;
+            data(i)=mean(data(i-movingavg(count):i+movingavg(count)));
+        end
+    end
+    plot(tVec,data,'Color',colours{conds},'Linewidth',2)
+
+    % TFR
+    subplot(2,3,conds+3)
+    hold on
+    S=data;
+    B = zeros(length(fVec),size(S,2)); 
+    width=7;
+    for i=1:size(S,1)          
+        for j=1:length(fVec)
+            f=fVec(j);
+            s=detrend(S(i,:));
+            dt_s = 1/Fs;
+            sf = f/width;
+            st = 1/(2*pi*sf);
+            t=-3.5*st:dt_s:3.5*st;
+            A = 1/(st*sqrt(2*pi));
+            m = A*exp(-t.^2/(2*st^2)).*exp(1i*2*pi*f.*t);
+            y = conv(s,m);
+            y = 2*(dt_s*abs(y)).^2;
+            y = y(ceil(length(m)/2):length(y)-floor(length(m)/2));
+            B(j,:) = y + B(j,:);
+        end
+    end
+    TFR = B/size(S,1);     
+    imagesc([-plot_time/2:dt:plot_time/2],fVec,TFR)
+    ylim([fVec(1),fVec(end)])
+    xlim([-plot_time/2 plot_time/2]);
+    title(Conds{conds})    
+    xlim([-plot_time/2,plot_time/2])
+    cbar
+end
+if match_clim
+    subplot(2,3,6)
+    name=strcat(name,'- C fixed ');
+    title(strcat(Conds{conds},name))
+    high_clim=caxis;
+    subplot(2,3,4)
+    title(strcat(Conds{1},name))
+    caxis(high_clim)
+    subplot(2,3,5)
+    title(strcat(Conds{2},name))
+    caxis(high_clim)
+end
+   
+print('-dpng','-r150',strcat('temp','.png'));
+blankSlide = Presentation.SlideMaster.CustomLayouts.Item(7);
+Slide1 = Presentation.Slides.AddSlide(1,blankSlide);
+Image1 = Slide1.Shapes.AddPicture(strcat(cd,'/temp','.png'),'msoFalse','msoTrue',120,0,700,540);%10,20,700,500
+close all
