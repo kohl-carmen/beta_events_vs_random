@@ -94,16 +94,25 @@ xlim([-plot_time/2 plot_time/2])
 % Image1 = Slide1.Shapes.AddPicture(strcat(cd,'/temp','.png'),'msoFalse','msoTrue',120,0,700,540);%10,20,700,500
 
 
-%% setup ANOVA
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ANOVA per timepoint
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% what are we testing?
+TEST={'Amp','Slope'};
+test=1;
+
+slope_int=20;
 within=table(categorical([0 1 2])','variablenames',{'Conds'}); 
 % 0 rnd
 % 1 low
 % 2 high
 
 %init
-MainEffect_p=[];
-MainEffect_F=[];
+MainEffect_p=nan(1,length(rnd));
+MainEffect_F=nan(1,length(rnd));
 MainEffect_abs=nan(1,length(rnd));
 LSD_abs.rnd_low=nan(1,length(rnd));
 LSD_abs.rnd_high=nan(1,length(rnd));
@@ -112,8 +121,32 @@ LSD_p.rnd_low=nan(1,length(rnd));
 LSD_p.rnd_high=nan(1,length(rnd));
 LSD_p.low_high=nan(1,length(rnd));
 
-for t=1:length(rnd)
-    tab=table(rnd(:,t),low(:,t),high(:,t),'variablenames',{Conds{:}});
+if test==1
+    timepoints=1:length(rnd);
+elseif test==2
+    timepoints=slope_int/2/dt+1:length(rnd)-slope_int/dt/2-1;
+end
+
+for t=timepoints
+    if test==1
+        tab=table(rnd(:,t),low(:,t),high(:,t),'variablenames',{Conds{:}});
+    elseif test==2
+        time_oi=t-slope_int/dt/2:t+slope_int/dt/2;
+        slope_rnd=[];
+        slope_low=[];
+        slope_high=[];
+        for partic=1:size(rnd,1)
+            P=polyfit(tVec(time_oi),rnd(partic,time_oi),1);
+            slope_rnd(partic)=P(1);
+            P=polyfit(tVec(time_oi),low(partic,time_oi),1);
+            slope_low(partic)=P(1);
+            P=polyfit(tVec(time_oi),high(partic,time_oi),1);
+            slope_high(partic)=P(1);
+        end
+        tab=table(slope_rnd',slope_low',slope_high','variablenames',{Conds{:}});
+    end
+    
+
     rm=fitrm(tab, strcat(Conds{1},'-',Conds{end},' ~1'), 'WithinDesign',within);
     ranovatbl = ranova(rm,'withinmodel','Conds');
     
@@ -210,7 +243,7 @@ end
 
 %replot main data on top
 for conds=1:length(Conds)
-    plot(-plot_time/2:dt:plot_time/2, mean(eval(Conds{conds})),'Linewidth',2,'Color', colours{conds});
+    lines(conds)=plot(-plot_time/2:dt:plot_time/2, mean(eval(Conds{conds})),'Linewidth',2,'Color', colours{conds});
 end
 
 
@@ -243,7 +276,7 @@ tx.FontSize=10;
 
 
 legend(lines,'Rnd','Low','High')
-
+title(TEST{test})
              
 
 print('-dpng','-r150',strcat('temp','.png'));
@@ -252,4 +285,8 @@ Slide1 = Presentation.Slides.AddSlide(1,blankSlide);
 Image1 = Slide1.Shapes.AddPicture(strcat(cd,'/temp','.png'),'msoFalse','msoTrue',120,0,700,540);%10,20,700,500
 
                         
+
+
+
+
 
