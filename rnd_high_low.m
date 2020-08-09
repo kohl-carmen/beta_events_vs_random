@@ -649,3 +649,223 @@ blankSlide = Presentation.SlideMaster.CustomLayouts.Item(7);
 Slide1 = Presentation.Slides.AddSlide(1,blankSlide);
 Image1 = Slide1.Shapes.AddPicture(strcat(cd,'/temp','.png'),'msoFalse','msoTrue',120,0,700,540);%10,20,700,500
 close all
+
+
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Find Turning points (peaks/troughs)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% This is a giant pain in the butt. In the end I did two things
+% 1) Autmatic turning point detection
+%     - smooth each waveform using a moving avg
+%     - get derivative of smoothed data
+%     - find where derivative crosses zero (peaks)
+%     - define turning points as abs max points within 5ms of those zwro crossings
+%     - sort into peaks/troughs (max/mins) based on whether derivatives preceding this point were neg/pos
+%     - saved as 'auto_turning_points'
+% 
+% 2) Manual turning point detection
+%     - literally picked them by hand
+%     - shockingly, not much better (but at least I get to make sure maxs and mins alternate)
+%     - saved as 'turning_points'
+
+%% smooth data using moving avg & get derivative
+fig1=figure('units','normalized','outerposition', [0 0 1 1]);
+fig2=figure('units','normalized','outerposition', [0 0 1 1]);
+for conds=1:length(Conds)  
+    for partic=1:size(rnd,1)
+
+        data=eval(Conds{conds});
+        figure(fig2)
+        subplot(6,5,partic+(size(rnd,1)*(conds-1)))
+        title(strcat('Partic',num2str(partic)))
+        hold on
+        figure(fig1)
+        subplot(6,5,partic+(size(rnd,1)*(conds-1)))
+        title(strcat('Partic',num2str(partic)))
+        hold on
+        data=data(partic,:);
+        plot(tVec,data,'Color',colours{conds},'Linewidth',2)
+        %smooth using moving avg
+        movingavg=6; %10ms
+        for i=movingavg+1:length(data)-(movingavg+1)
+            data(i)=mean(data(i-movingavg:i+movingavg));
+        end
+        plot(tVec,data,'Color','k','Linewidth',1)
+        
+        figure(fig2)
+        plot(tVec,data,'Color',colours{conds},'Linewidth',2)
+        der=diff(data);
+        der=[nan,der];
+        %mydiff
+        data1=[data,nan,nan];
+        data2=[nan,nan,data];
+        data3=data1-data2;
+        yyaxis right
+        plot(tVec,der,'Color','k','Linewidth',1)
+        if conds==1
+            smooth_rnd(partic,:)=data;
+            der_rnd(partic,:)=der;
+        elseif conds==2
+            smooth_low(partic,:)=data;
+            der_low(partic,:)=der;
+        elseif conds==3
+            smooth_high(partic,:)=data;
+            der_high(partic,:)=der;
+        end
+    end
+end
+figure(fig1)
+print('-dpng','-r150',strcat('temp','.png'));
+blankSlide = Presentation.SlideMaster.CustomLayouts.Item(7);
+Slide1 = Presentation.Slides.AddSlide(1,blankSlide);
+Image1 = Slide1.Shapes.AddPicture(strcat(cd,'/temp','.png'),'msoFalse','msoTrue',120,0,700,540);%10,20,700,500
+figure(fig2)
+print('-dpng','-r150',strcat('temp','.png'));
+blankSlide = Presentation.SlideMaster.CustomLayouts.Item(7);
+Slide1 = Presentation.Slides.AddSlide(1,blankSlide);
+Image1 = Slide1.Shapes.AddPicture(strcat(cd,'/temp','.png'),'msoFalse','msoTrue',120,0,700,540);%10,20,700,500
+close all
+
+        
+%% define turning points based on derivative zero crossings
+auto_turning_points_alg=struct();
+figure('units','normalized','outerposition', [0 0 1 1]);
+for conds=1:length(Conds)  
+    for partic=1:size(rnd,1)
+        og_data=eval(Conds{conds});
+        data=eval(strcat('smooth_',Conds{conds}));
+        der=eval(strcat('der_',Conds{conds}));
+        og_data=og_data(partic,:);
+        data=data(partic,:);
+        der=der(partic,:);
+        %crop
+        tVec_der=tVec(find(tVec==-200):find(tVec==+200));
+        data=data(find(tVec==-200):find(tVec==+200));
+        der=der(find(tVec==-200):find(tVec==+200));
+        og_data=og_data(find(tVec==-200):find(tVec==+200));
+        subplot(6,5,partic+(size(rnd,1)*(conds-1)))
+        hold on
+        yyaxis right
+        title(strcat(Conds{conds},'- Partic',num2str(partic)))
+        plot(tVec_der,der,'--','Color',[.7 .7 .7]);
+        plot([tVec_der(1) tVec_der(end)],[0 0],':','Color', [.5 .5 .5])
+        
+        yyaxis left
+        plot(tVec_der,data,'--','Color','k','Linewidth',1)
+        plot(tVec_der,og_data,'Color',colours{conds},'Linewidth',2)
+
+        %find derivative zero crossings
+        zci = @(v) find(v(:).*circshift(v(:), [-1 0]) <= 0);   
+        zx=zci(der);
+        %delete if too close together
+        for j=1:length(zx)
+            if j<length(zx)
+                if zx(j+1)-zx(j)<4
+                    temp=0;
+                    while (zx(j+temp+1)-zx(j+temp)<4) & j+temp+1<length(zx)
+                        temp=temp+1;
+                    end
+                    cont_x=j:j+temp;
+                    [temp,max_i]=max(abs(data(cont_x)));
+                    keep=cont_x(max_i);
+                    zx(cont_x(cont_x~=keep))=[];
+                end
+            end
+        end
+        plot(tVec_der(zx), data(zx), 'ro');
+        
+        % find abs max in og_data within 5ms of detected zx
+        og_zx=[];
+        mins=[];
+        maxs=[];
+        within=5;%ms
+        zx(find(zx<within/dt | zx>length(tVec_der)-within/dt))=[];
+        for i=1:length(zx)
+            [temp,temp_i]=max(abs(data(zx(i)-floor(within/2/dt):zx(i)+floor(within/2/dt))));
+            og_zx(i)=zx(i)-floor(within/2/dt)-1+temp_i;
+            % sort into trouhgs and peaks
+            try %get mean of 3 points of derivative prior to this turning point
+                opp=0;
+                derest=mean(der(og_zx(i)-3:og_zx(i)-1));
+            catch %if you can't get those, do the following points and apply the opposite logic
+                opp=1;
+                derest=mean(der(og_zx(i)+1:og_zx(i)+3));
+            end
+            if (opp==0 & derest>0) | (opp==1 & derest<0)
+                maxs=[maxs,og_zx(i)];
+            else
+                mins=[mins,og_zx(i)];
+            end
+        end
+        plot(tVec_der(og_zx), og_data(og_zx), 'bp');       
+        plot(tVec_der(mins),og_data(mins),'r.','Markersize',20)
+        plot(tVec_der(maxs),og_data(maxs),'g.','Markersize',20)
+        
+        
+        auto_turning_points.(Conds{conds}).(strcat('P',num2str(partic)))=og_zx;
+        auto_turning_points.(Conds{conds}).(strcat('P',num2str(partic),'_mins'))=mins;
+        auto_turning_points.(Conds{conds}).(strcat('P',num2str(partic),'_maxs'))=maxs;
+        
+    end
+    
+end
+% cd('F:\Brown\Beta_v_Rnd')
+% save('auto_turning_points','auto_turning_points')
+print('-dpng','-r150',strcat('temp','.png'));
+blankSlide = Presentation.SlideMaster.CustomLayouts.Item(7);
+Slide1 = Presentation.Slides.AddSlide(1,blankSlide);
+Image1 = Slide1.Shapes.AddPicture(strcat(cd,'/temp','.png'),'msoFalse','msoTrue',120,0,700,540);%10,20,700,500
+close all   
+
+%% manually select turning points
+% for conds=1:length(Conds)  
+%     for partic=1:size(rnd,1)
+%         clf
+%         og_data=eval(Conds{conds});
+%         og_data=og_data(partic,:);
+%         hold on
+%         title(strcat(Conds{conds},'- Partic',num2str(partic)))
+%         plot(tVec,og_data,'Color',colours{conds},'Linewidth',2)
+%         turning_point=input('turning_points- starting with min(x):');
+%         turning_points.(Conds{conds}).(strcat('P',num2str(partic)))=turning_point;
+%     end
+% end
+% cd('F:\Brown\Beta_v_Rnd')
+% save('turning_points','turning_points')
+
+
+%% load manually selected turning points
+cd('F:\Brown\Beta_v_Rnd')
+load('turning_points')
+figure('units','normalized','outerposition', [0 0 1 1]);
+for conds=1:length(Conds)  
+    for partic=1:size(rnd,1)
+        subplot(6,5,partic+(size(rnd,1)*(conds-1)))
+        og_data=eval(Conds{conds});
+        og_data=og_data(partic,:);
+        hold on
+        title(strcat(Conds{conds},'- Partic',num2str(partic)))
+        plot(tVec,og_data,'Color',colours{conds},'Linewidth',2)
+        x=turning_points.(Conds{conds}).(strcat('P',num2str(partic)));
+        for i=1:length(x)
+            [temp, x(i)]=min(abs(round(tVec)-round(x(i))));    
+            if round(i/2)==i/2
+                plot(tVec(x(i)), og_data(x(i)),'.','Markersize',20,'Color','g')
+            else
+                plot(tVec(x(i)), og_data(x(i)),'.','Markersize',20,'Color','r')
+            end
+        end
+    end
+end
+print('-dpng','-r150',strcat('temp','.png'));
+blankSlide = Presentation.SlideMaster.CustomLayouts.Item(7);
+Slide1 = Presentation.Slides.AddSlide(1,blankSlide);
+Image1 = Slide1.Shapes.AddPicture(strcat(cd,'/temp','.png'),'msoFalse','msoTrue',120,0,700,540);%10,20,700,500
+close all
+
