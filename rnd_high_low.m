@@ -734,7 +734,7 @@ close all
 
         
 %% define turning points based on derivative zero crossings
-auto_turning_points_alg=struct();
+auto_turning_points=struct();
 figure('units','normalized','outerposition', [0 0 1 1]);
 for conds=1:length(Conds)  
     for partic=1:size(rnd,1)
@@ -840,10 +840,16 @@ close all
 % save('turning_points','turning_points')
 
 
-%% load manually selected turning points
+%% load manually or automatically  selected turning points
 cd('F:\Brown\Beta_v_Rnd')
+auto=1;
 load('turning_points')
+if auto
+    load('auto_turning_points')
+    turning_points=auto_turning_points;
+end
 figure('units','normalized','outerposition', [0 0 1 1]);
+clf
 for conds=1:length(Conds)  
     for partic=1:size(rnd,1)
         subplot(6,5,partic+(size(rnd,1)*(conds-1)))
@@ -852,14 +858,25 @@ for conds=1:length(Conds)
         hold on
         title(strcat(Conds{conds},'- Partic',num2str(partic)))
         plot(tVec,og_data,'Color',colours{conds},'Linewidth',2)
-        x=turning_points.(Conds{conds}).(strcat('P',num2str(partic)));
+        %max
+        x=turning_points.(Conds{conds}).(strcat('P',num2str(partic),'_maxs'));   
         for i=1:length(x)
-            [temp, x(i)]=min(abs(round(tVec)-round(x(i))));    
-            if round(i/2)==i/2
-                plot(tVec(x(i)), og_data(x(i)),'.','Markersize',20,'Color','g')
+            if auto               
+                [temp, x(i)]=min(abs(round(tVec)-round(tVec_der(x(i)))));
             else
-                plot(tVec(x(i)), og_data(x(i)),'.','Markersize',20,'Color','r')
+                [temp, x(i)]=min(abs(round(tVec)-round(x(i))));   
             end
+            plot(tVec(x(i)), og_data(x(i)),'.','Markersize',20,'Color','g')
+        end
+        %mins
+        x=turning_points.(Conds{conds}).(strcat('P',num2str(partic),'_mins')); 
+        for i=1:length(x)
+            if auto               
+                [temp, x(i)]=min(abs(round(tVec)-round(tVec_der(x(i)))));
+            else
+                [temp, x(i)]=min(abs(round(tVec)-round(x(i))));   
+            end
+            plot(tVec(x(i)), og_data(x(i)),'.','Markersize',20,'Color','r')
         end
     end
 end
@@ -868,4 +885,197 @@ blankSlide = Presentation.SlideMaster.CustomLayouts.Item(7);
 Slide1 = Presentation.Slides.AddSlide(1,blankSlide);
 Image1 = Slide1.Shapes.AddPicture(strcat(cd,'/temp','.png'),'msoFalse','msoTrue',120,0,700,540);%10,20,700,500
 close all
+
+
+%% test turning point differences
+% first let's take the first trough after midpoint and compare latencies
+%%%%%%%%%%%%%%%%%%%%%
+prev_or_post=2;   % peak/trough pre (1) or post (2) main trough
+peak_or_trough=2; % peaks (1) or troughs (2)
+auto=1;           % automatically (1) or manually (0) selected turning points
+%%%%%%%%%%%%%%%%%%%%%
+
+figure('units','normalized','outerposition', [0 0 1 1]);
+clf
+subplot(2,1,1)
+hold on
+if prev_or_post==1
+    if peak_or_trough==1
+        title('Prev Peaks')
+    else
+        title('Prev Troughs')
+    end
+elseif prev_or_post==2
+    if peak_or_trough==1
+        title('Post Peaks')
+    else
+        title('Post Troughs')
+    end
+end
+cd('F:\Brown\Beta_v_Rnd')
+load('turning_points')
+if auto
+    load('auto_turning_points')
+    turning_points=auto_turning_points;
+end
+high_ylim=[-6.00000000000000e-08,3.00000000000000e-08];
+
+post_trough_latency=[];
+pre_trough_latency=[];
+post_peak_latency=[];
+pre_peak_latency=[];
+
+for conds=1:length(Conds)  
+    data=eval(Conds{conds});
+    lines(conds)=plot(-plot_time/2:dt:plot_time/2, mean(data),'Linewidth',2,'Color', colours{conds});
+    for partic=1:size(rnd,1)
+        % convert turning points to indeces;
+        if peak_or_trough==1
+            x=turning_points.(Conds{conds}).(strcat('P',num2str(partic),'_maxs'));
+        else
+            x=turning_points.(Conds{conds}).(strcat('P',num2str(partic),'_mins'));
+        end
+        for i=1:length(x)
+            if auto               
+                [temp, x(i)]=min(abs(round(tVec)-round(tVec_der(x(i)))));
+            else
+                [temp, x(i)]=min(abs(round(tVec)-round(x(i))));   
+            end
+        end
+        if peak_or_trough==2
+            % find turning min corresponding to main trough
+            [temp, mini]=min(abs(tVec(x)));          
+            if prev_or_post==1
+                %prev trough
+                trough_oi_i=x(mini-1);
+                plot(tVec(trough_oi_i), high_ylim(1)+ ((high_ylim(2)-high_ylim(1))/100*(5*conds)),'.','Markersize',20,'Color',colours{conds});       
+                pre_trough_latency(conds,partic)=tVec(trough_oi_i);
+                
+            elseif prev_or_post==2
+                %post trough
+                trough_oi_i=x(mini+1);
+                plot(tVec(trough_oi_i), high_ylim(1)+ ((high_ylim(2)-high_ylim(1))/100*(5*conds)),'.','Markersize',20,'Color',colours{conds});       
+                post_trough_latency(conds,partic)=tVec(trough_oi_i);
+               
+            end
+        elseif peak_or_trough==1
+            if prev_or_post==1
+                trough_oi_i= x(tVec(x)<0);%first find all before 0
+                trough_oi_i=max(trough_oi_i); %hten take mac
+                plot(tVec(trough_oi_i), high_ylim(1)+ ((high_ylim(2)-high_ylim(1))/100*(5*conds)),'.','Markersize',20,'Color',colours{conds});       
+                pre_peak_latency(conds,partic)=tVec(trough_oi_i);
+            elseif prev_or_post==2
+                trough_oi_i= x(tVec(x)>0);%first find all after 0
+                trough_oi_i=min(trough_oi_i); %hten take mac
+                plot(tVec(trough_oi_i), high_ylim(1)+ ((high_ylim(2)-high_ylim(1))/100*(5*conds)),'.','Markersize',20,'Color',colours{conds});       
+                post_peak_latency(conds,partic)=tVec(trough_oi_i);
+            end
+        end
+    end
+end
+        
+% [H p]=ttest(post_trough_latency(1,:),post_trough_latency(3,:));
+if prev_or_post==1
+    if peak_or_trough==1
+        trough_oi_latency=pre_peak_latency;
+    elseif peak_or_trough==2
+        trough_oi_latency=pre_trough_latency;
+    end
+elseif prev_or_post==2
+    if peak_or_trough==1
+        trough_oi_latency=post_peak_latency;
+    elseif peak_or_trough==2
+        trough_oi_latency=post_trough_latency;
+    end
+end
+%% bar chart
+subplot(2,2,3)
+hold on
+title('Trough Latency (95CI)')
+bar_x = 1:2;
+data = mean(trough_oi_latency,2)';
+data(2,:)=zeros(size(data));
+hb = bar(bar_x,data)  ;
+%CI
+for conds=1:length(Conds)
+    hb(conds).FaceColor = colours{conds}';
+    x = trough_oi_latency(conds,:);                      % Create Data
+    SEM = std(x)/sqrt(length(x));               % Standard Error
+    ts = tinv([0.025  0.975],length(x)-1);      % T-Score
+    CI = mean(x) + ts*SEM;                      % Confidence Intervals
+    errhigh(conds) = [CI(2)];
+    errlow(conds)  = [CI(1)];
+end
+er = errorbar([.8 1 1.2],data(1,:),errlow,errhigh);    
+er.Color = [0 0 0];                            
+er.LineStyle = 'none';  
+xlim([.5 1.5])
+ax=gca;
+ax.XTick=[];
+
+
+%% ANOVA
+subplot(2,2,4)
+hold on
+title('Stats')
+within=table(categorical([0 1 2])','variablenames',{'Conds'}); 
+tab=table(trough_oi_latency(1,:)',trough_oi_latency(2,:)',trough_oi_latency(3,:)','variablenames',{Conds{:}});
+rm=fitrm(tab, strcat(Conds{1},'-',Conds{end},' ~1'), 'WithinDesign',within);
+ranovatbl = ranova(rm,'withinmodel','Conds');
+tx1=sprintf('\nANOVA: F = %2.2f, p = %2.3f\n\n',table2array(ranovatbl(3,4)),table2array(ranovatbl(3,5)));
+tx2='';
+if table2array(ranovatbl(3,5))<.05
+    %FOLLOW UP
+    lsd=multcompare(rm,'Conds','comparisonType','lsd');
+    lsd=table2cell(lsd);
+    if lsd{1,5}<.05
+        LSD_abs.rnd_low=1;
+    end
+    if lsd{2,5}<.05
+        LSD_abs.rnd_high=1;
+    end
+    if lsd{4,5}<.05
+        LSD_abs.low_high=1;
+    end
+    LSD_p.rnd_low=lsd{1,5};
+    LSD_p.rnd_high=lsd{2,5};
+    LSD_p.low_high=lsd{4,5};
+    
+    tx2=sprintf('\n\nLSD follow up:\n\n\trnd - low: p = %2.3f\n\n\trnd - high: p = %2.3f\n\n\tlow - high: p = %2.3f\n\n',lsd{1,5},lsd{2,5},lsd{4,5});
+
+end
+
+tx=text(.1,.8,tx1);
+tx.Color=[.2 .2 .2];
+tx.FontWeight='bold';
+tx.FontSize=10;
+tx=text(.1,.5,tx2);
+
+ax=gca;
+ax.YTick=[];
+ax.XTick=[];
+
+print('-dpng','-r150',strcat('temp','.png'));
+blankSlide = Presentation.SlideMaster.CustomLayouts.Item(7);
+Slide1 = Presentation.Slides.AddSlide(1,blankSlide);
+Image1 = Slide1.Shapes.AddPicture(strcat(cd,'/temp','.png'),'msoFalse','msoTrue',120,0,700,540);%10,20,700,500
+close all
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
